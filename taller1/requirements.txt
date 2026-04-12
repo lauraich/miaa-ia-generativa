@@ -1,0 +1,7 @@
+# Dependencias del Taller Práctico #1 — EcoMarket
+
+# Opción A: Modelo open-source (recomendado)
+ollama>=0.1.0
+
+# Opción B: OpenAI (comentar/descomentar según la opción elegida)
+# openai>=1.0.0
