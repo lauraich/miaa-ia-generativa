@@ -42,50 +42,74 @@ Se propone una **arquitectura en tres capas**:
 > **Elección para este taller:** Se usa **Llama 3.1 8B via Ollama** (open-source, sin costo) para la Fase 3, lo que permite demostrar la arquitectura de prompts sin depender de APIs de pago. En un entorno de producción real, se recomendaría **Gemini 3 Flash** por su relación precio/calidad y su capa gratuita para desarrollo.
 
 ---
-
 ## Fase 2: Fortalezas, Limitaciones y Riesgos Éticos
 
-### Fortalezas
+### 1. Fortalezas
 
-- **Disponibilidad 24/7 sin costo incremental** — El sistema no duerme, no toma descansos y escala automáticamente ante picos de demanda (ej. Black Friday), algo imposible con un equipo humano fijo.
-- **Reducción drástica del tiempo de respuesta** — De 24 horas a un estimado de 1-2 minutos para el 80% de las consultas repetitivas, impactando directamente la satisfacción del cliente (CSAT).
-- **Consistencia en las respuestas** — A diferencia de los agentes humanos, el modelo aplica las mismas políticas de devolución y el mismo tono de marca en cada interacción, eliminando la variabilidad.
-- **Descarga cognitiva para agentes humanos** — El 20% complejo recibe un borrador generado por IA, permitiendo al agente enfocarse en la empatía y la resolución creativa en lugar de redactar desde cero.
-- **Trazabilidad y mejora continua** — Cada interacción queda registrada, permitiendo analizar los patrones de consulta, detectar productos con alta tasa de devolución, o identificar problemas logísticos sistémicos.
+#### Disponibilidad, escalabilidad y operación continua
+El sistema ofrece disponibilidad 24/7 sin costo incremental, ya que no requiere turnos ni descansos, lo que le permite operar de manera continua. Además, tiene la capacidad de atender picos de demanda como son eventos tipo Black Friday o día sin IVA sin necesidad de ampliar el equipo humano. Esto se complementa con una arquitectura modular y escalable que permite aumentar la capacidad por componentes específicos, optimizando tanto los costos como el rendimiento del sistema.
 
-### Limitaciones
+#### Eficiencia operativa y tiempos de respuesta
+La implementación permite una reducción drástica del tiempo de respuesta, pasando de aproximadamente 24 horas a solo segundos o minutos en el 80% de las consultas automatizables. Esto genera un impacto directo en la satisfacción del cliente, al ofrecer respuestas más rápidas y oportunas, y al mismo tiempo reduce significativamente la carga operativa de los agentes humanos, permitiéndoles enfocarse en casos de mayor complejidad.
 
-- **El 20% complejo es una barrera real** — El modelo no puede reemplazar la empatía genuina en quejas emocionales, situaciones ambiguas o clientes en estado de frustración intensa. Forzar IA en esos casos puede escalar el conflicto.
-- **Dependencia de la calidad de la base de datos** — Si la información de pedidos o el catálogo tiene errores, el modelo los amplifica y los presenta con confianza aparente. El principio *"garbage in, garbage out"* aplica directamente.
-- **Límite del contexto del modelo** — Los LLMs tienen una ventana de contexto finita. Si un cliente tiene un historial de 50 interacciones previas, no todo puede inyectarse como contexto RAG, lo que puede llevar a respuestas que ignoran el historial.
-- **Multilingüismo y modismos regionales** — EcoMarket puede tener clientes en distintas regiones con variantes del español o inglés. El modelo puede responder de forma técnicamente correcta pero culturalmente distante.
-- **Latencia en consultas complejas** — La pipeline RAG (buscar en BD → construir prompt → generar respuesta) puede tardar 3-8 segundos en casos con mucho contexto, lo cual puede sentirse lento en un chat en vivo.
+También se debe considerar que se dispone de monitoreo inmediato ante volúmenes de consultas, tiempos de respuesta, tasas de resolución automática, entre otras, lo que facilita tomar decisiones operativas rápidas.
 
-### Riesgos Éticos
+#### Precisión y confiabilidad en información
+El uso de una arquitectura RAG permite recuperar datos directamente desde las fuentes propias de la compañía, como pedidos, entregas y devoluciones, evitando depender únicamente del conocimiento preentrenado del modelo. Esto no solo mejora la precisión de las respuestas, sino que también facilita la trazabilidad y garantiza la actualidad de la información transaccional utilizada en cada interacción.
 
-#### 1. Alucinaciones
-El riesgo más inmediato. Un LLM sin RAG puede inventar fechas de entrega, números de seguimiento o políticas de devolución inexistentes. La arquitectura RAG mitiga esto para datos transaccionales, pero persiste el riesgo en preguntas fuera del dominio ("¿este producto contiene tal componente químico?") donde el modelo podría inferir en lugar de admitir ignorancia.
+#### Consistencia y estandarización del servicio
+El sistema garantiza respuestas homogéneas en cuanto a la forma en que se atiende a los usuarios, alineándose con las políticas definidas por la organización. Esto elimina la variabilidad propia de los agentes humanos y contribuye a una mejora consistente en la calidad percibida del servicio.
 
-**Mitigación propuesta:** Implementar un mecanismo de *"no sé"* explícito: si la confianza del retrieval es baja, el sistema debe escalar al agente humano en lugar de generar una respuesta especulativa.
+Además Puede integrarse en múltiples canales como Chat web, WhatsApp, email y redes sociales. Mantenienco consistencia en todos los puntos de contacto.
 
-#### 2. Sesgo algorítmico
-Si el modelo fue pre-entrenado con datos sesgados (lo cual es inherente a todos los LLMs de gran escala), podría ofrecer respuestas más elaboradas o empáticas a ciertos perfiles de clientes. Por ejemplo, podría interpretar diferente un mismo mensaje dependiendo del nombre del remitente o del vocabulario utilizado.
+#### Eficiencia del agente humano
+En el 20% de los casos más complejos, el sistema genera borradores de respuesta que pueden ser editados por los agentes humanos, lo que reduce su carga cognitiva y les permite enfocarse en tareas de mayor valor como la empatía, la negociación y la resolución de problemas. Este enfoque responde a una estrategia de aumentación, no de reemplazo, donde la tecnología potencia las capacidades del agente en lugar de sustituirlo.
 
-**Mitigación propuesta:** Auditorías periódicas de respuestas segmentadas por demografía de clientes. Evaluar si la tasa de escalación humana es uniforme entre segmentos.
+#### Mejora continua
+El sistema permite identificar patrones de consulta, detectar productos con alta tasa de devolución y reconocer fallas logísticas o de catálogo, convirtiéndose en una base sólida para la analítica y la optimización continua del negocio.
 
-#### 3. Privacidad de datos
-Este es el riesgo más grave desde el punto de vista regulatorio (GDPR, Ley 1581 en Colombia). Para que RAG funcione, el sistema necesita acceder a datos personales del cliente (nombre, dirección, historial de compras) e inyectarlos en el prompt. Si se usa una API externa (OpenAI), estos datos podrían ser procesados en servidores de terceros.
 
-**Mitigación propuesta:**
-- Usar modelos *on-premise* u *open-source* (Llama 3.1 en servidores propios) para no exfiltrar datos a terceros.
-- Implementar pseudonimización: inyectar solo el ID de pedido en el prompt, no el nombre completo ni la dirección.
-- Obtener consentimiento explícito del cliente para el procesamiento automatizado de su consulta.
+### 2. Limitaciones
 
-#### 4. Impacto laboral
-Este es el riesgo ético más humano y frecuentemente ignorado. EcoMarket tiene agentes de atención al cliente cuyo trabajo podría verse amenazado por esta implementación.
+#### Complejidad humana
+El modelo no puede reemplazar la empatía humana, lo que limita su efectividad en la atención de quejas emocionales, clientes frustrados o situaciones ambiguas y sensibles. En estos casos, existe el riesgo de que las respuestas sean percibidas como mecánicas si no hay una intervención humana adecuada que aporte comprensión y adaptación al contexto. 
 
-**Postura recomendada — "aumentación, no reemplazo":** El objetivo explícito del sistema debe ser liberar a los agentes de las tareas repetitivas para que puedan especializarse en resolución de conflictos, mejora del producto y construcción de relaciones con clientes VIP. La métrica de éxito no debería ser "número de agentes reducidos", sino "satisfacción del agente" y "calidad de resolución del 20% complejo". Cualquier reducción de personal debería hacerse de forma transparente, con reentrenamiento y tiempo suficiente.
+#### Costo inicial
+La implementación de una arquitectura que integra RAG, LLM y sistemas internos conlleva un costo inicial elevado y una alta complejidad técnica. Este proceso requiere una inversión en infraestructura y desarrollo, así como la participación de talento especializado en áreas como machine learning, desarrollo backend y MLOps, lo que puede representar una barrera importante para su adopción.
 
----
+#### Dependencia de la calidad de los datos
+El sistema depende completamente de la calidad de los datos siguiendo el principio de garbage in, garbage out. Problemas como estados de pedidos incorrectos o políticas desactualizadas no solo afectan las respuestas, sino que el modelo no está en capacidad de corregirlos, lo que puede generar desinformación y afectar la experiencia del cliente.
 
-*Para la implementación práctica de prompts, ver la carpeta [`/fase3`](./fase3/).*
+#### Limitaciones técnicas del modelo y la arquitectura
+Los LLMs presentan una ventana de contexto finita, lo que dificulta el manejo de historiales extensos de interacción. Además, existen desafíos de latencia, especialmente en consultas complejas con arquitectura RAG, donde las respuestas  pueden tomar más tiempo, y aumentar aún más en flujos híbridos que involucran clasificador, generación y revisión humana. A esto se suma la dificultad para procesar consultas ambiguas o de múltiples intenciones, como serían solicitudes que combinan devolución y estado del pedido, lo que puede derivar en respuestas incompletas o incorrectamente enroutadas.
+
+#### Lenguaje, contexto cultural y entrada del usuario
+El sistema presenta sensibilidad a modismos regionales y al uso de español coloquial o con errores ortográficos, lo que puede afectar la correcta interpretación de las consultas. Como resultado, existe el riesgo de generar respuestas que, aunque técnicamente correctas, resulten culturalmente inadecuadas o fuera de contexto para el usuario.
+
+
+### 3. Riesgos Éticos
+
+#### Alucinaciones y confiabilidad
+Existe el riesgo de generación de información incorrecta, como fechas de entrega, estados de pedidos o políticas inexistentes, lo cual puede ocurrir incluso en sistemas con RAG si el proceso de recuperación falla, la información es ambigua o incompleta, o la consulta está fuera del dominio del modelo. Para mitigar este riesgo, se proponen medidas como la implementación de un mecanismo explícito de “no sé”, el escalamiento automático a un agente humano cuando la confianza sea baja y la validación obligatoria de que toda respuesta transaccional esté respaldada por una fuente previamente recuperada.
+
+
+#### Sesgo algorítmico
+Existen posibles diferencias en el trato al cliente según el nivel de formalidad, el vocabulario utilizado o el perfil implícito del usuario, lo que puede derivar en experiencias desiguales. Para mitigar este riesgo, se plantean auditorías periódicas de las respuestas segmentadas por demografía o perfil, la evaluación de las tasas de escalamiento entre distintos segmentos y la inclusión de instrucciones explícitas en el prompt que garanticen un trato igualitario independientemente de las características del cliente.
+
+
+#### Privacidad y protección de datos
+El sistema implica el uso de datos sensibles como nombre, dirección, historial de compras y métodos de pago, lo que introduce riesgos especialmente cuando se emplean APIs externas que procesan la información en infraestructura de terceros. Este escenario debe evaluarse bajo marcos regulatorios. Para mitigar estos riesgos, se proponen estrategias como el uso de modelos on-premise o self-hosted, la pseudonimización o anonimización de datos, la revisión de las políticas de retención de datos de los proveedores y la obtención de consentimiento explícito por parte del cliente.
+
+Además existe el riesgo de uso indebido del sistema por parte de usuarios, quienes pueden intentar manipular el modelo para acceder a información no autorizada. Para mitigar este tipo de amenazas, se recomienda implementar una validación estricta de los inputs, establecer controles robustos de acceso a los datos y aplicar procesos de sanitización de prompts que reduzcan la exposición a instrucciones maliciosas.
+
+#### Impacto laboral
+La implementación del sistema conlleva un riesgo de desplazamiento o incertidumbre laboral, lo que puede impactar negativamente en la motivación de los agentes humanos. Frente a esto, se propone una postura donde las tareas repetitivas se automatizan y el talento humano se enfoca en generar valor. Para gestionar este cambio de manera efectiva, se recomiendan buenas prácticas como una comunicación transparente desde el inicio, la capacitación en el uso de nuevas herramientas y la definición de métricas de éxito orientadas a la satisfacción del agente y la calidad de resolución, en lugar de la reducción de personal.
+
+Se debe tener en cuenta que reducir la supervisión humana a medida que aumenta la automatización, puede derivar en errores no detectados y un deterioro progresivo de la calidad del servicio. Para mitigar este problema, se recomienda mantener un enfoque de human-in-the-loop en casos críticos y realizar revisiones periódicas de calidad.
+
+#### Transparencia hacia el cliente
+Existe el riesgo de que el cliente no tenga claridad sobre si está interactuando con un sistema automatizado o con un agente humano, lo cual puede considerarse una práctica engañosa en ciertos contextos. Para mitigar este problema, se recomienda identificar de forma explícita al asistente virtual desde el inicio de la interacción y ofrecer la opción de escalar la conversación a un agente humano en caso de ser necesario.
+
+#### Riesgo reputacional
+Un error como una respuesta incorrecta o inapropiada puede escalar rápidamente en redes sociales y generar un impacto desproporcionado frente al volumen total de aciertos del sistema, afectando la reputación de la marca. Para mitigar este riesgo, se recomienda implementar filtros de seguridad que prevengan respuestas sensibles y establecer un monitoreo en tiempo real de las interacciones críticas para detectar y corregir incidentes de forma oportuna.
+
