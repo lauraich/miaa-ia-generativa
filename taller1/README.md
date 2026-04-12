@@ -7,7 +7,7 @@
 
 Se propone una **arquitectura en tres capas**:
 
-1. **Clasificador de intención** — Un LLM ligero (GPT-5-nano o un modelo fine-tuned pequeño como `distilbert-base`) que clasifica cada consulta entrante en una de dos rutas: *automatizable* (80%) o *requiere humano* (20%). Esta clasificación es rápida, económica y suficiente para un problema de enrutamiento binario.
+1. **Clasificador de intención** — Un LLM ligero (GPT-5-nano o un modelo fine-tuned pequeño como distilbert-base) que clasifica cada consulta entrante en una de dos rutas: *automatizable* (80%) o *requiere humano* (20%). Esta clasificación es rápida, económica y suficiente para un problema de enrutamiento binario.
 
 2. **Módulo RAG** para las consultas se propone utilizar un modelo pequeño de cualquier proveedor cómo GPT-5.4-mini o Gemini 3 Flash. El modelo tendría tendría dos formas de obtener información: a través de una tool puede recuperar información en tiempo real de la base de datos de EcoMarket con el fin de verificar información sobre el estado de un pedido y puede hacer una busqueda RAG para obtener información sobre  políticas de devolución o catálogo de productos (documentos de la empresa). Esto elimina las alucinaciones sobre datos transaccionales.
 
@@ -23,7 +23,29 @@ Se propone una **arquitectura en tres capas**:
 | **Facilidad de integración** | Compleja | Moderada | **Alta** — API estándar (OpenAI / Google / Ollama) |
 | **Calidad de respuesta** | Alta en dominio específico | Muy alta | **Alta** para el 80% repetitivo |
 
-**Justificación central:** El problema de EcoMarket no es un problema de comprensión del lenguaje natural avanzada, sino de precisión en datos transaccionales y velocidad. Un modelo fine-tuned sería costoso de mantener cada vez que cambia el catálogo o las políticas. La arquitectura propuesta resuelve esto: el LLM aporta la fluidez lingüística, la **tool call** recupera datos transaccionales en tiempo real (estado de pedidos), y la búsqueda RAG aporta la información sobre políticas y catálogo, o cualquier documento de la empresa. Modelos como GPT-5.4-mini o Gemini 3 Flash ofrecen el balance óptimo entre costo y calidad para este tipo de respuestas estructuradas.
+#### Costo
+
+Un modelo fine-tuned requiere GPU costosa para el entrenamiento y re-entrenamiento cada vez que cambian productos o políticas. GPT-5.4 completo, a $2.50/1M tokens de entrada y $15/1M de salida, supera los $3,000 USD mensuales a 5,000 consultas diarias con prompts típicos de ~800 tokens. La propuesta RAG con un modelo pequeño como GPT-5.4-mini (~$0.00128/consulta) o Gemini 3 Flash (~$0.00085/consulta) reduce ese gasto a entre $130 y $192 USD mensuales — más de 15 veces más barato que usar el modelo completo.
+
+#### Escalabilidad
+
+Con un modelo fine-tuned, cada vez que EcoMarket lanza un producto nuevo, cambia una política o ajusta precios, el modelo debe re-entrenarse. En un e-commerce de crecimiento rápido esto puede ocurrir semanalmente, convirtiendo el mantenimiento en un cuello de botella operativo. GPT-5.4 completo escala bien en volumen, pero su costo por token hace que crecer sea financieramente insostenible. Con RAG, la base de datos y los documentos indexados se actualizan de forma completamente independiente al modelo: EcoMarket puede agregar 100 productos nuevos al catálogo sin tocar el LLM, solo actualizando los documentos de recuperación.
+
+#### Precisión en datos transaccionales
+
+El modelo fine-tuned aprende patrones de pedidos durante el entrenamiento, pero no tiene acceso en tiempo real a la base de datos. Si el estado de un pedido cambia de "en camino" a "entregado", el modelo no lo sabe. Los modelos grandes como GPT-5.4, sin RAG, también pueden alucinar fechas de entrega, números de seguimiento o políticas inexistentes, ya que responden desde su entrenamiento estático. La propuesta elimina este riesgo estructuralmente: la tool call consulta la base de datos en el momento exacto de cada consulta, de modo que el modelo nunca genera un estado de pedido y posteriormente lo recibe como contexto verificado y solo lo formula en lenguaje natural.
+
+#### Facilidad de integración
+
+Un modelo fine-tuned exige infraestructura propia para servirlo (servidores GPU), pipelines de datos para el entrenamiento y un equipo técnico dedicado, con tiempos de implementación inicial de 2 a 6 meses. GPT-5.4 completo se integra via API de forma más directa. La propuesta expone la misma interfaz de API estándar independientemente del proveedor elegido (OpenAI, Google o Llama local), y sus tres componentes — clasificador, tool call y RAG — son modulares y pueden ser implementados por un desarrollador de forma rápida.
+
+#### Calidad de respuesta
+
+El modelo fine-tuned ofrece alta calidad únicamente para los patrones vistos durante el entrenamiento; ante una consulta inusual o un producto recién lanzado, la respuesta puede ser incorrecta sin que el modelo lo señale. GPT-5.4 completo ofrece la calidad más alta del mercado, pero es un uso de recursos desproporcionado para responder preguntas como "¿dónde está mi pedido ECO-003?" — equivalente a contratar un experto senior para contestar FAQs. Para el 80% de consultas repetitivas de EcoMarket (pedidos, devoluciones, catálogo), un modelo pequeño con contexto RAG inyectado produce respuestas prácticamente casi iguales que las de un modelo grande.
+
+### Justificación central:
+
+El problema de EcoMarket no es un problema de comprensión del lenguaje natural avanzada, sino de precisión en datos transaccionales y velocidad. Un modelo fine-tuned sería costoso de mantener cada vez que cambia el catálogo o las políticas. La arquitectura propuesta resuelve esto: el LLM aporta la fluidez lingüística, la tool call recupera datos transaccionales en tiempo real (estado de pedidos), y la búsqueda RAG aporta la información sobre políticas y catálogo, o cualquier documento de la empresa. Modelos como GPT-5.4-mini o Gemini 3 Flash ofrecen el balance óptimo entre costo y calidad para este tipo de respuestas estructuradas.
 
 ### Comparación de modelos candidatos
 
@@ -39,7 +61,7 @@ Se propone una **arquitectura en tres capas**:
 | **Rendimiento en español** | Muy bueno | Muy bueno |
 | **Veredicto** | Sólido si ya se usa infraestructura OpenAI | **Mejor precio/calidad** para proyecto nuevo |
 
-> **Elección para este taller:** Se usa **Llama 3.1 8B via Ollama** (open-source, sin costo) para la Fase 3, lo que permite demostrar la arquitectura de prompts sin depender de APIs de pago. En un entorno de producción real, se recomendaría **Gemini 3 Flash** por su relación precio/calidad y su capa gratuita para desarrollo.
+**Elección para este taller:** Se usa **Llama 3.1 8B via Ollama** (open-source, sin costo) para la Fase 3, lo que permite demostrar la arquitectura de prompts sin depender de APIs de pago. Cabe resaltar que en un entorno de producción real, se recomendaría **Gemini 3 Flash** por su relación precio/calidad y su capa gratuita para desarrollo.
 
 ---
 ## Fase 2: Fortalezas, Limitaciones y Riesgos Éticos
