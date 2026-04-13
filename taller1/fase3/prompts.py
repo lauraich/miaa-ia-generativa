@@ -8,6 +8,13 @@ Requiere:
     pip install openai   (con variable de entorno OPENAI_API_KEY)
 
 Por defecto usa Ollama (open-source, sin costo).
+
+Ejecución:
+    python prompts.py                      # demo completa (incluye comparación A/B)
+    python prompts.py --comparar ECO-003   # solo comparar pedido básico vs mejorado
+    python prompts.py --comparar-notable   # solo ECO-003 y ECO-999 + criterios
+    python prompts.py --comparar-devolucion  # ejemplo fijo de comparación devolución
+    python prompts.py --interactivo        # menú (opciones 3 y 4 = comparación A/B)
 """
 
 import os
@@ -64,6 +71,10 @@ from database import (
 # EJERCICIO 1: CONSULTA DE ESTADO DE PEDIDO
 # ══════════════════════════════════════════════════════════════
 
+SYSTEM_PROMPT_PEDIDO_BASICO = (
+    "Responde en español"
+)
+
 SYSTEM_PROMPT_PEDIDO = """Eres un agente de servicio al cliente amable, empático y profesional de EcoMarket, \
 una tienda en línea de productos sostenibles y ecológicos.
 
@@ -84,9 +95,34 @@ Reglas de respuesta:
 - Si no encuentras el pedido en el contexto, dilo honestamente y ofrece alternativas de contacto."""
 
 
+def _contexto_pedido(numero_pedido: str) -> str:
+    """Texto de contexto (mismos datos para prompt básico y mejorado)."""
+    numero_limpio = numero_pedido.strip()
+    pedido = buscar_pedido(numero_limpio)
+    if pedido:
+        return f"""INFORMACIÓN DEL PEDIDO (usa solo estos datos para responder):
+{formatear_pedido_para_contexto(pedido)}"""
+    return f"""No se encontró ningún pedido con el número '{numero_limpio}' en el sistema."""
+
+
+def _prompt_final_con_consulta(contexto: str, mensaje_consulta: str) -> str:
+    return f"{contexto}\n\n---\nConsulta del cliente:\n{mensaje_consulta}"
+
+
+def consultar_pedido_basico(numero_pedido: str) -> str:
+    """Misma información de pedido que `consultar_pedido`, con instrucciones mínimas (comparación A/B)."""
+    contexto = _contexto_pedido(numero_pedido)
+    numero_limpio = numero_pedido.strip()
+    mensaje_usuario = f"Dame el estado del pedido {numero_limpio}."
+    return llamar_modelo(
+        SYSTEM_PROMPT_PEDIDO_BASICO,
+        _prompt_final_con_consulta(contexto, mensaje_usuario),
+    )
+
+
 def consultar_pedido(numero_pedido: str) -> str:
     """
-    Ejercicio 1: Consulta el estado de un pedido usando RAG + LLM.
+    Ejercicio 1: Consulta el estado de un pedido usando RAG + LLM (prompt mejorado).
 
     Parámetros:
         numero_pedido: El número de pedido (ej: 'ECO-003')
@@ -94,25 +130,61 @@ def consultar_pedido(numero_pedido: str) -> str:
     Retorna:
         La respuesta generada por el modelo.
     """
-    pedido = buscar_pedido(numero_pedido)
-
-    if pedido:
-        contexto = f"""INFORMACIÓN DEL PEDIDO (usa solo estos datos para responder):
-{formatear_pedido_para_contexto(pedido)}"""
-    else:
-        contexto = f"""No se encontró ningún pedido con el número '{numero_pedido}' en el sistema."""
-
+    contexto = _contexto_pedido(numero_pedido)
+    numero_limpio = numero_pedido.strip()
     mensaje_usuario = (
-        f"Hola, me gustaría saber el estado de mi pedido número {numero_pedido}."
+        f"Hola, me gustaría saber el estado de mi pedido número {numero_limpio}."
+    )
+    return llamar_modelo(
+        SYSTEM_PROMPT_PEDIDO,
+        _prompt_final_con_consulta(contexto, mensaje_usuario),
     )
 
-    prompt_final = f"{contexto}\n\n---\nConsulta del cliente:\n{mensaje_usuario}"
-    return llamar_modelo(SYSTEM_PROMPT_PEDIDO, prompt_final)
+
+def comparar_pedido(numero_pedido: str) -> tuple[str, str]:
+    """Devuelve (respuesta_prompt_basico, respuesta_prompt_mejorado) para el mismo pedido."""
+    return consultar_pedido_basico(numero_pedido), consultar_pedido(numero_pedido)
+
+
+def texto_criterios_comparacion_notable(numero_pedido: str) -> str | None:
+    """
+    Casos donde el prompt mejorado suele ampliar la brecha frente al básico (mismo contexto).
+
+    - ECO-003: retraso (disculpa + motivo, enlace).
+    - ECO-999: pedido inexistente (negación clara, sin inventar).
+    """
+    n = numero_pedido.strip().upper()
+    if n == "ECO-003":
+        return (
+            "\n  --- Qué valorar en esta comparación (pedido retrasado) ---\n"
+            "  - ¿La respuesta mejorada incluye disculpa explícita y el motivo del retraso del contexto?\n"
+            "  - ¿Se mencionan enlace de seguimiento y fecha estimada?\n"
+            "  - ¿El prompt básico puede omitir empatía o estructura ante un retraso?\n"
+        )
+    if n == "ECO-999":
+        return (
+            "\n  --- Qué valorar en esta comparación (pedido inexistente) ---\n"
+            "  - ¿La respuesta mejorada indica claramente que no hay pedido, sin inventar datos?\n"
+            "  - ¿El básico tiende a ser vago o a suponer información no presente en el contexto?\n"
+            "  - ¿Se ofrece una alternativa de contacto de forma honesta?\n"
+        )
+    return None
+
+
+def imprimir_criterios_comparacion_notable(numero_pedido: str) -> None:
+    """Imprime criterios pedagógicos si el número es uno de los casos notables."""
+    texto = texto_criterios_comparacion_notable(numero_pedido)
+    if texto:
+        print(texto)
 
 
 # ══════════════════════════════════════════════════════════════
 # EJERCICIO 2: PROCESO DE DEVOLUCIÓN
 # ══════════════════════════════════════════════════════════════
+
+SYSTEM_PROMPT_DEVOLUCION_BASICO = (
+    "Responde en español"
+)
 
 SYSTEM_PROMPT_DEVOLUCION = """Eres un agente de servicio al cliente amable, empático y profesional de EcoMarket, \
 una tienda en línea de productos sostenibles y ecológicos.
@@ -133,9 +205,25 @@ INSTRUCCIONES CRÍTICAS:
    al equipo de soporte en soporte@ecomarket.co."""
 
 
+def _contexto_politica_devolucion() -> str:
+    return f"""POLÍTICA DE DEVOLUCIONES DE ECOMARKET (usa solo esta información):
+{formatear_politica_para_contexto()}"""
+
+
+def consultar_devolucion_basico(producto: str, motivo: str, numero_pedido: str = None) -> str:
+    """Misma política que `consultar_devolucion`, con instrucciones mínimas (comparación A/B)."""
+    contexto_politica = _contexto_politica_devolucion()
+    partes = [f"¿Puedo devolver {producto}?", f"Motivo: {motivo}."]
+    if numero_pedido:
+        partes.append(f"Pedido: {numero_pedido}.")
+    mensaje_usuario = " ".join(partes)
+    prompt_final = f"{contexto_politica}\n\n---\nConsulta del cliente:\n{mensaje_usuario}"
+    return llamar_modelo(SYSTEM_PROMPT_DEVOLUCION_BASICO, prompt_final)
+
+
 def consultar_devolucion(producto: str, motivo: str, numero_pedido: str = None) -> str:
     """
-    Ejercicio 2: Guía al cliente en el proceso de devolución usando RAG + LLM.
+    Ejercicio 2: Guía al cliente en el proceso de devolución usando RAG + LLM (prompt mejorado).
 
     Parámetros:
         producto: El nombre del producto a devolver.
@@ -145,8 +233,7 @@ def consultar_devolucion(producto: str, motivo: str, numero_pedido: str = None) 
     Retorna:
         La respuesta generada por el modelo.
     """
-    contexto_politica = f"""POLÍTICA DE DEVOLUCIONES DE ECOMARKET (usa solo esta información):
-{formatear_politica_para_contexto()}"""
+    contexto_politica = _contexto_politica_devolucion()
 
     partes_consulta = [
         f"Hola, compré '{producto}' y me gustaría solicitar una devolución.",
@@ -161,6 +248,13 @@ def consultar_devolucion(producto: str, motivo: str, numero_pedido: str = None) 
     return llamar_modelo(SYSTEM_PROMPT_DEVOLUCION, prompt_final)
 
 
+def comparar_devolucion(producto: str, motivo: str, numero_pedido: str = None) -> tuple[str, str]:
+    """Devuelve (respuesta_prompt_basico, respuesta_prompt_mejorado) para la misma consulta."""
+    return consultar_devolucion_basico(producto, motivo, numero_pedido), consultar_devolucion(
+        producto, motivo, numero_pedido
+    )
+
+
 # ══════════════════════════════════════════════════════════════
 # DEMOSTRACIÓN INTERACTIVA
 # ══════════════════════════════════════════════════════════════
@@ -171,29 +265,68 @@ def separador(titulo: str):
     print("═" * 60)
 
 
+def _imprimir_comparacion_pedido(numero: str, descripcion: str):
+    separador(f"EJERCICIO 1 — Comparación A/B — {descripcion}")
+    print(f"  Número de pedido: {numero}\n")
+    basico, mejorado = comparar_pedido(numero)
+    print("  --- Salida: prompt básico ---\n")
+    print(basico)
+    print("\n  --- Salida: prompt mejorado ---\n")
+    print(mejorado)
+    imprimir_criterios_comparacion_notable(numero)
+
+
+def _imprimir_comparacion_devolucion(producto: str, motivo: str, numero_pedido: str, descripcion: str):
+    separador(f"EJERCICIO 2 — Comparación A/B — {descripcion}")
+    print(f"  Producto: {producto}")
+    print(f"  Motivo: {motivo}\n")
+    basico, mejorado = comparar_devolucion(producto, motivo, numero_pedido)
+    print("  --- Salida: prompt básico ---\n")
+    print(basico)
+    print("\n  --- Salida: prompt mejorado ---\n")
+    print(mejorado)
+
+
 def demo_completo():
     """Ejecuta una demostración de los dos ejercicios con casos de prueba variados."""
 
     print("\n🌿 EcoMarket — Sistema de Atención al Cliente con IA")
     print(f"   Modelo: {MODEL} ({'OpenAI' if USAR_OPENAI else 'Ollama — open-source'})\n")
 
-    # ── Ejercicio 1: Casos de estado de pedido ──
+    # ── Ejercicio 1: comparación prompt básico vs mejorado (mismos datos) ──
+    # Casos notables (retraso / inexistente): tras cada A/B se imprimen criterios para evaluar la brecha.
 
-    casos_pedido = [
+    print(
+        "  Comparación A/B en casos notables: ECO-003 (retraso) y ECO-999 (inexistente). "
+        "Después de cada par de respuestas se listan criterios para contrastar básico vs mejorado.\n"
+    )
+
+    _imprimir_comparacion_pedido("ECO-003", "Pedido retrasado — debe incluir disculpa (A/B)")
+    _imprimir_comparacion_pedido("ECO-999", "Número de pedido inexistente (A/B)")
+
+    # ── Ejercicio 1: solo prompt mejorado (evita duplicar llamadas en los A/B anteriores) ──
+
+    casos_pedido_solo_mejorado = [
         ("ECO-002", "Pedido en camino — caso normal"),
-        ("ECO-003", "Pedido retrasado — debe incluir disculpa"),
         ("ECO-005", "Pedido ya entregado"),
         ("ECO-008", "Pedido cancelado — debe informar reembolso"),
-        ("ECO-999", "Número de pedido inexistente"),
     ]
 
-    for numero, descripcion in casos_pedido:
+    for numero, descripcion in casos_pedido_solo_mejorado:
         separador(f"EJERCICIO 1 — {descripcion}")
         print(f"  Número de pedido: {numero}\n")
-        respuesta = consultar_pedido(numero)
-        print(respuesta)
+        print(consultar_pedido(numero))
 
-    # ── Ejercicio 2: Casos de devolución ──
+    # ── Ejercicio 2: una comparación A/B (higiene / no devolvible) ──
+
+    _imprimir_comparacion_devolucion(
+        producto="Shampoo sólido sin sulfatos",
+        motivo="el olor no me agradó y ya lo usé una vez",
+        numero_pedido="ECO-007",
+        descripcion="Producto de higiene personal abierto — NO devolvible",
+    )
+
+    # ── Ejercicio 2: solo prompt mejorado ──
 
     casos_devolucion = [
         {
@@ -201,12 +334,6 @@ def demo_completo():
             "motivo": "llegó con una abolladura visible y no cierra bien",
             "numero_pedido": "ECO-005",
             "descripcion": "Producto devolvible — defecto físico",
-        },
-        {
-            "producto": "Shampoo sólido sin sulfatos",
-            "motivo": "el olor no me agradó y ya lo usé una vez",
-            "numero_pedido": "ECO-007",
-            "descripcion": "Producto de higiene personal abierto — NO devolvible",
         },
         {
             "producto": "Vela aromática de cera de soya",
@@ -226,12 +353,13 @@ def demo_completo():
         separador(f"EJERCICIO 2 — {caso['descripcion']}")
         print(f"  Producto: {caso['producto']}")
         print(f"  Motivo: {caso['motivo']}\n")
-        respuesta = consultar_devolucion(
-            producto=caso["producto"],
-            motivo=caso["motivo"],
-            numero_pedido=caso["numero_pedido"],
+        print(
+            consultar_devolucion(
+                producto=caso["producto"],
+                motivo=caso["motivo"],
+                numero_pedido=caso["numero_pedido"],
+            )
         )
-        print(respuesta)
 
 
 # ── Modo interactivo opcional ──
@@ -243,9 +371,11 @@ def modo_interactivo():
 
     while True:
         print("\n¿Qué deseas consultar?")
-        print("  1. Estado de un pedido")
-        print("  2. Proceso de devolución")
-        opcion = input("Opción (1/2): ").strip()
+        print("  1. Estado de un pedido (prompt mejorado)")
+        print("  2. Proceso de devolución (prompt mejorado)")
+        print("  3. Comparar prompt básico vs mejorado — pedido")
+        print("  4. Comparar prompt básico vs mejorado — devolución")
+        opcion = input("Opción (1/2/3/4): ").strip()
 
         if opcion == "salir":
             break
@@ -257,6 +387,23 @@ def modo_interactivo():
             motivo = input("Motivo de devolución: ").strip()
             numero = input("Número de pedido (opcional, Enter para omitir): ").strip() or None
             print("\n" + consultar_devolucion(producto, motivo, numero))
+        elif opcion == "3":
+            numero = input("Número de pedido (ej: ECO-003): ").strip()
+            basico, mejorado = comparar_pedido(numero)
+            print("\n--- Salida: prompt básico ---\n")
+            print(basico)
+            print("\n--- Salida: prompt mejorado ---\n")
+            print(mejorado)
+            imprimir_criterios_comparacion_notable(numero)
+        elif opcion == "4":
+            producto = input("Nombre del producto: ").strip()
+            motivo = input("Motivo de devolución: ").strip()
+            numero = input("Número de pedido (opcional, Enter para omitir): ").strip() or None
+            basico, mejorado = comparar_devolucion(producto, motivo, numero)
+            print("\n--- Salida: prompt básico ---\n")
+            print(basico)
+            print("\n--- Salida: prompt mejorado ---\n")
+            print(mejorado)
         else:
             print("Opción no válida.")
 
@@ -267,5 +414,42 @@ if __name__ == "__main__":
 
     if len(sys.argv) > 1 and sys.argv[1] == "--interactivo":
         modo_interactivo()
+    elif len(sys.argv) > 2 and sys.argv[1] == "--comparar":
+        numero = sys.argv[2]
+        print("\n🌿 EcoMarket — Comparación prompt básico vs mejorado (pedido)")
+        print(f"   Modelo: {MODEL}\n")
+        print(f"   Número de pedido: {numero}\n")
+        basico, mejorado = comparar_pedido(numero)
+        print("--- Salida: prompt básico ---\n")
+        print(basico)
+        print("\n--- Salida: prompt mejorado ---\n")
+        print(mejorado)
+        imprimir_criterios_comparacion_notable(numero)
+    elif len(sys.argv) > 1 and sys.argv[1] == "--comparar-notable":
+        print("\n🌿 EcoMarket — Comparación notable (ECO-003 retraso, ECO-999 inexistente)")
+        print(f"   Modelo: {MODEL}\n")
+        print(
+            "   Mismo contexto en ambos prompts; los criterios al final ayudan a ver "
+            "dónde suele ampliarse la brecha.\n"
+        )
+        for num, desc in (
+            ("ECO-003", "Pedido retrasado"),
+            ("ECO-999", "Pedido inexistente"),
+        ):
+            _imprimir_comparacion_pedido(num, desc)
+    elif len(sys.argv) > 1 and sys.argv[1] == "--comparar-devolucion":
+        print("\n🌿 EcoMarket — Comparación prompt básico vs mejorado (devolución)")
+        print(f"   Modelo: {MODEL}\n")
+        producto = "Shampoo sólido sin sulfatos"
+        motivo = "el olor no me agradó y ya lo usé una vez"
+        numero = "ECO-007"
+        print(f"   Producto: {producto}")
+        print(f"   Motivo: {motivo}")
+        print(f"   Pedido: {numero}\n")
+        basico, mejorado = comparar_devolucion(producto, motivo, numero)
+        print("--- Salida: prompt básico ---\n")
+        print(basico)
+        print("\n--- Salida: prompt mejorado ---\n")
+        print(mejorado)
     else:
         demo_completo()
