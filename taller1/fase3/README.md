@@ -3,13 +3,25 @@
 ## Estructura
 
 ```
-fase3/
-├── database.py      # Base de datos simulada de pedidos + política de devoluciones
-├── prompts.py       # Prompts y lógica principal
-└── README.md        # Este archivo
+taller1/                 # raíz del taller (pyproject, uv, Makefile)
+├── Makefile             # atajos: demo, interactivo, comparaciones A/B
+├── main.py
+└── fase3/
+    ├── database.py      # Base de datos simulada de pedidos + política de devoluciones
+    ├── prompts.py       # Prompts, demo, comparación básico vs mejorado, modo interactivo
+    └── README.md        # Este archivo
 ```
 
 ## Requisitos
+
+### Entorno Python (recomendado)
+
+Desde la carpeta `taller1` del repositorio:
+
+```bash
+uv sync
+# o: pip install -r requirements.txt
+```
 
 ### Opción A — Modelo open-source (recomendado para el taller)
 
@@ -19,12 +31,14 @@ fase3/
 curl -fsSL https://ollama.com/install.sh | sh
 # Windows: descargar desde https://ollama.com
 
-# 2. Descargar el modelo Llama 3.1 (4.7 GB)
-ollama pull llama3.1
+# 2. Descargar el modelo usado por el código (Ollama)
+ollama pull llama3:8b
 
-# 3. Instalar dependencia Python
+# 3. Dependencia Python (si no usas solo uv sync)
 pip install ollama
 ```
+
+Por defecto, `prompts.py` usa **Ollama** con el modelo `llama3:8b` (ver variable `MODEL` en el código).
 
 ### Opción B — OpenAI (requiere API key de pago)
 
@@ -36,14 +50,54 @@ export OPENAI_API_KEY="sk-..."
 
 ## Ejecución
 
+Los comandos siguientes asumen que estás en la carpeta `taller1` (un nivel **arriba** de `fase3`), salvo que indiques `cd fase3` y llames a `python prompts.py` directamente.
+
+### Con Python / uv
+
 ```bash
-cd fase3
+cd taller1
 
-# Modo demo automático (ejecuta todos los casos de prueba)
-python prompts.py
+# Demo completa (ejercicios 1 y 2 + comparaciones A/B integradas en el flujo)
+uv run python fase3/prompts.py
+# o, desde fase3:
+cd fase3 && python prompts.py
+```
 
-# Modo interactivo (el usuario escribe sus propias consultas)
-python prompts.py --interactivo
+**Modo comparación (CLI)**
+
+```bash
+uv run python fase3/prompts.py --comparar ECO-003          # un pedido: básico vs mejorado
+uv run python fase3/prompts.py --comparar-notable          # ECO-003 y ECO-999 + criterios
+uv run python fase3/prompts.py --comparar-devolucion       # ejemplo fijo (Shampoo / ECO-007)
+```
+
+**Modo interactivo** (menú con opciones 1–4; escribe `salir` para terminar)
+
+```bash
+uv run python fase3/prompts.py --interactivo
+```
+
+- **1** — Estado de pedido (prompt mejorado)  
+- **2** — Devolución (prompt mejorado)  
+- **3** — Comparar básico vs mejorado para un pedido que indiques  
+- **4** — Comparar básico vs mejorado para una devolución que indiques  
+
+### Con Makefile (en `taller1/`)
+
+Requiere **GNU Make** (por ejemplo Git Bash en Windows) y **uv** en el `PATH`. En PowerShell sin `make`, usa los mismos comandos que en la sección anterior.
+
+```bash
+cd taller1
+
+make install          # uv sync
+make demo             # demo completa
+make interactivo      # menú interactivo
+make comparar         # por defecto PEDIDO=ECO-003
+make comparar PEDIDO=ECO-005
+make comparar-notable
+make comparar-devolucion
+make main             # ejecuta main.py en la raíz del taller
+make help             # lista objetivos y variables
 ```
 
 ## Casos de prueba incluidos
@@ -72,6 +126,10 @@ python prompts.py --interactivo
 ### ¿Por qué RAG y no fine-tuning?
 
 Los datos de pedidos cambian constantemente. Con RAG, el modelo siempre accede a información actualizada sin necesidad de reentrenamiento. El `system_prompt` define el *comportamiento*, y el contexto inyectado proporciona los *hechos*.
+
+### Comparación “básico vs mejorado”
+
+Además del prompt mejorado con contexto y reglas, el código incluye un **prompt mínimo** (`SYSTEM_PROMPT_PEDIDO_BASICO` / equivalente en devoluciones) para contrastar tono, uso del contexto y cumplimiento de políticas frente a la versión completa.
 
 ### Elementos clave del system prompt
 
