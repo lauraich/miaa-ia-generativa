@@ -100,6 +100,17 @@ make main             # ejecuta main.py en la raíz del taller
 make help             # lista objetivos y variables
 ```
 
+#### ¿Para qué sirve cada modo del Makefile?
+
+- `make help`: muestra todos los objetivos disponibles y variables útiles (`UV`, `PEDIDO`).
+- `make install` / `make sync`: prepara el entorno e instala dependencias con `uv sync`.
+- `make demo`: corre la demostración completa de `fase3/prompts.py` (casos de pedido y devolución, con comparaciones A/B incluidas en la demo).
+- `make interactivo`: abre el menú interactivo para probar consultas manuales.
+- `make comparar`: compara prompt básico vs mejorado para un pedido puntual (usa `PEDIDO`, por defecto `ECO-003`).
+- `make comparar-notable`: ejecuta comparación en casos “notables” (`ECO-003` y `ECO-999`).
+- `make comparar-devolucion`: compara básico vs mejorado en un caso fijo de devolución (shampoo usado, `ECO-007`).
+- `make main`: ejecuta `main.py` de la raíz del taller (útil para validar que el proyecto base corre).
+
 ## Casos de prueba incluidos
 
 ### Ejercicio 1 — Estado de pedido
