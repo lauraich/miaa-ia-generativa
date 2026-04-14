@@ -7,45 +7,51 @@
 
 Se propone una **arquitectura en tres capas**:
 
-1. **Clasificador de intención** : Un LLM ligero (GPT-5-nano o un modelo fine-tuned pequeño como distilbert-base) que clasifica cada consulta entrante en una de dos rutas: *automatizable* (80%) o *requiere humano* (20%). Esta clasificación es rápida, económica y suficiente para un problema de enrutamiento binario.
+1. **Clasificador de intención** : Un LLM ligero cómo GPT-5-nano que clasifica cada consulta entrante en una de dos rutas: automatizable (80%) o requiere humano (20%). Esta clasificación es rápida, económica y suficiente para un problema de enrutamiento binario.
 
-2. **Módulo RAG**: para las consultas se propone utilizar un modelo pequeño de cualquier proveedor cómo GPT-5.4-mini o Gemini 3 Flash. El modelo tendría tendría dos formas de obtener información: a través de una tool puede recuperar información en tiempo real de la base de datos de EcoMarket con el fin de verificar información sobre el estado de un pedido y puede hacer una busqueda RAG para obtener información sobre  políticas de devolución o catálogo de productos (documentos de la empresa). Esto elimina las alucinaciones sobre datos transaccionales.
+2. **Módulo RAG**: para las consultas se propone utilizar un modelo pequeño de cualquier proveedor cómo GPT-5.4-mini o Gemini 3 Flash. El modelo tendría dos formas de obtener información: a través de una tool recuperar información en tiempo real de la base de datos de EcoMarket con el fin de verificar información sobre el estado de un pedido y hacer una busqueda RAG para obtener información sobre  políticas de devolución o catálogo de productos (documentos de la empresa). Esto elimina las alucinaciones sobre datos transaccionales.
 
-3. **Interfaz de asistencia al agente humano**: Para el 20% complejo, el mismo LLM genera un *borrador de respuesta* sugerido que el agente humano puede editar, reduciendo su carga cognitiva sin eliminar el toque humano.
+3. **Interfaz de asistencia al agente humano**: Para el 20% complejo, el mismo LLM genera un borrador de respuesta sugerido que el agente humano puede editar, reduciendo su carga cognitiva sin eliminar el toque humano.
 
 ### ¿Por qué este modelo y no otro?
 
-| Criterio | Fine-tuned LLM dedicado | GPT-5.4 completo | **RAG + modelo pequeño (propuesta)** |
+| Criterio | Fine-tuned LLM dedicado | RAG + GPT-5.4 completo | **RAG + modelo pequeño (propuesta)** |
 |---|---|---|---|
-| **Costo** | Alto (entrenamiento) | Alto (por token) | **Bajo** — modelo pequeño + contexto dinámico |
+| **Precio** | Alto (entrenamiento) | Alto (por token) | Bajo — modelo pequeño + contexto dinámico |
 | **Escalabilidad** | Requiere re-entrenamiento ante cambios | Alta | **Alta** — la BD se actualiza sin reentrenar |
-| **Precisión en datos transaccionales** | Media (depende del fine-tuning) | Media (puede alucinar) | **Alta** — datos frescos via tool call + RAG |
-| **Facilidad de integración** | Compleja | Moderada | **Alta** — API estándar (OpenAI / Google / Ollama) |
-| **Calidad de respuesta** | Alta en dominio específico | Muy alta | **Alta** para el 80% repetitivo |
+| **Precisión en datos transaccionales** | Alta — datos actualizados via tool call |Alta — datos actualizados via tool call + RAG | Alta — datos actualizados via tool call + RAG |
+| **Facilidad de integración** | Media | Alta — API estándar | Alta — API estándar (OpenAI / Google / Ollama) |
+| **Calidad de respuesta** | Alta en dominio específico | Muy alta | Alta |
 
-#### Costo
+#### Precio
 
-Un modelo fine-tuned requiere GPU costosa para el entrenamiento y re-entrenamiento cada vez que cambian productos o políticas. GPT-5.4 completo, a $2.50/1M tokens de entrada y $15/1M de salida, supera los $3,000 USD mensuales a 5,000 consultas diarias con prompts típicos de aprox. 800 tokens. La propuesta RAG con un modelo pequeño como GPT-5.4-mini (aprox. $0.00128/consulta) o Gemini 3 Flash (~$0.00085/consulta) reduce ese gasto a entre $130 y $192 USD mensuales,es decir, más de 15 veces más barato que usar el modelo completo.
+Un modelo fine-tuned requiere GPU costosa para el entrenamiento y re-entrenamiento cada vez que cambian productos o políticas. GPT-5.4 completo, a $2.50/1M tokens de entrada y $15/1M de salida, supera los $3,000 USD mensuales a 5,000 consultas diarias con prompts típicos de aprox. 800 tokens. La propuesta RAG con un modelo pequeño como GPT-5.4-mini (aprox. $0.00128/consulta) o Gemini 3 Flash (~$0.00085/consulta) reduce ese gasto a entre $130 y $192 USD mensuales, es decir, más de 15 veces más barato que usar el modelo completo.
 
 #### Escalabilidad
 
-Con un modelo fine-tuned, cada vez que EcoMarket lanza un producto nuevo, cambia una política o ajusta precios, el modelo debe re-entrenarse. En un e-commerce de crecimiento rápido esto puede ocurrir semanalmente, convirtiendo el mantenimiento en un cuello de botella operativo. GPT-5.4 completo escala bien en volumen, pero su costo por token hace que crecer sea financieramente insostenible. Con RAG, la base de datos y los documentos indexados se actualizan de forma completamente independiente al modelo: EcoMarket puede agregar 100 productos nuevos al catálogo sin tocar el LLM, solo actualizando los documentos de recuperación.
+Con un modelo fine-tuned, cada vez que EcoMarket lanza un producto nuevo, cambia una política o ajusta precios, el modelo debe re-entrenarse. En un e-commerce de crecimiento rápido esto puede ocurrir semanalmente, convirtiendo el mantenimiento en un cuello de botella operativo. GPT-5.4 completo escala bien en volumen, pero su costo por token hace que crecer sea financieramente insostenible. Con RAG, la base de datos y los documentos indexados se actualizan de forma completamente independiente al modelo: EcoMarket puede agregar 100 productos nuevos al catálogo sin modificar el LLM, solo actualizando los documentos de recuperación.
 
 #### Precisión en datos transaccionales
 
-El modelo fine-tuned aprende patrones de pedidos durante el entrenamiento, pero no tiene acceso en tiempo real a la base de datos. Si el estado de un pedido cambia de "en camino" a "entregado", el modelo no lo sabe. Los modelos grandes como GPT-5.4, sin RAG, también pueden alucinar fechas de entrega, números de seguimiento o políticas inexistentes, ya que responden desde su entrenamiento estático. La propuesta elimina este riesgo estructuralmente: la tool call consulta la base de datos en el momento exacto de cada consulta, de modo que el modelo nunca genera un estado de pedido y posteriormente lo recibe como contexto verificado y solo lo formula en lenguaje natural.
+La propuesta elimina este riesgo de forma estructural: mediante tool calling, el sistema consulta la base de datos en el momento exacto de cada solicitud, reduciendo significativamente la probabilidad de generar una respuesta incorrecta. Cabe resaltar que el uso de modelos de mayor tamaño aporta una mejor capacidad de comprensión del contexto, lo que les permite interpretar con mayor precisión las instrucciones, reforzando la calidad y fiabilidad de las respuestas.
 
 #### Facilidad de integración
 
-Un modelo fine-tuned exige infraestructura propia para servirlo (servidores GPU), pipelines de datos para el entrenamiento y un equipo técnico dedicado, con tiempos de implementación inicial de 2 a 6 meses. GPT-5.4 completo se integra via API de forma más directa. La propuesta expone la misma interfaz de API estándar independientemente del proveedor elegido (OpenAI, Google o Llama local), y sus tres componentes — clasificador, tool call y RAG — son modulares y pueden ser implementados por un desarrollador de forma rápida.
+Ambos enfoques se integran mediante APIs; sin embargo, la complejidad del modelo fine-tuned no radica en su consumo, sino en su preparación. Requiere la construcción de pipelines de datos, procesos de entrenamiento y múltiples configuraciones previas, lo que implica mayor esfuerzo técnico y tiempos de implementación más largos. En contraste, modelos como GPT-5.4 y GPT-5.4-mini pueden consumirse directamente vía API, sin necesidad de ese proceso previo, facilitando una adopción mucho más rápida.
+
+La propuesta se basa en una API estándar, independiente del proveedor, y en componentes modulares: clasificador, tool calling y RAG, que agilizan su implementación.
 
 #### Calidad de respuesta
 
-El modelo fine-tuned ofrece alta calidad únicamente para los patrones vistos durante el entrenamiento; ante una consulta inusual o un producto recién lanzado, la respuesta puede ser incorrecta sin que el modelo lo señale. GPT-5.4 completo ofrece la calidad más alta del mercado, pero es un uso de recursos desproporcionado para responder preguntas como "¿dónde está mi pedido ECO-003?" — equivalente a contratar un experto senior para contestar FAQs. Para el 80% de consultas repetitivas de EcoMarket (pedidos, devoluciones, catálogo), un modelo pequeño con contexto RAG inyectado produce respuestas prácticamente casi iguales que las de un modelo grande.
+El modelo fine-tuned ofrece alta calidad únicamente para los patrones vistos durante el entrenamiento; ante una consulta inusual la respuesta puede ser incorrecta sin que el modelo lo señale. GPT-5.4 completo ofrece la calidad más alta del mercado, pero es un uso de recursos desproporcionado para responder preguntas como "¿dónde está mi pedido ECO-003?" — equivalente a contratar un experto senior para contestar FAQs. Para el 80% de consultas repetitivas de EcoMarket (pedidos, devoluciones, catálogo), un modelo pequeño con contexto RAG inyectado produce respuestas similares a las de un modelo grande.
 
 ### Justificación central:
 
-El problema de EcoMarket no es un problema de comprensión del lenguaje natural avanzada, sino de precisión en datos transaccionales y velocidad. Un modelo fine-tuned sería costoso de mantener cada vez que cambia el catálogo o las políticas. La arquitectura propuesta resuelve esto: el LLM aporta la fluidez lingüística, la tool call recupera datos transaccionales en tiempo real (estado de pedidos), y la búsqueda RAG aporta la información sobre políticas y catálogo, o cualquier documento de la empresa. Modelos como GPT-5.4-mini o Gemini 3 Flash ofrecen el balance óptimo entre costo y calidad para este tipo de respuestas estructuradas.
+El problema de EcoMarket no radica en la comprensión avanzada del lenguaje natural, sino en la precisión de los datos transaccionales y la velocidad de respuesta. Un modelo fine-tuned implicaría altos costos de mantenimiento ante cambios en preguntas frecuentes, en el catálogo o en las políticas.
+
+La arquitectura propuesta aborda este reto de forma eficiente: el LLM aporta la fluidez lingüística, el tool calling permite recuperar datos transaccionales en tiempo real (como el estado de los pedidos) y el enfoque RAG facilita el acceso a información actualizada sobre políticas, catálogo u otros documentos de la empresa.
+
+En este contexto, modelos como GPT-5.4-mini o Gemini 3 Flash ofrecen un balance óptimo entre costo y calidad para gestionar este tipo de respuestas estructuradas.
 
 ### Comparación de modelos candidatos
 
@@ -56,10 +62,9 @@ El problema de EcoMarket no es un problema de comprensión del lenguaje natural 
 | **Costo estimado por consulta** (~500 tokens input, ~200 output) | ~$0.00128 | ~$0.00085 |
 | **Capa gratuita** | No | Sí (Google AI Studio) |
 | **Ventana de contexto** | 400K tokens | 1M tokens |
-| **Velocidad** | Alta | Muy alta (3× más rápido que modelos Pro) |
-| **Ecosistema de integración** | Muy maduro (OpenAI SDK) | Bueno (Google AI SDK) |
+| **Velocidad** | Alta | Alta |
+| **Ecosistema de integración** | Bueno (OpenAI SDK) | Bueno (Google AI SDK) |
 | **Rendimiento en español** | Muy bueno | Muy bueno |
-| **Veredicto** | Sólido si ya se usa infraestructura OpenAI | **Mejor precio/calidad** para proyecto nuevo |
 
 **Elección para este taller:** Se usa **Llama 3.1 8B via Ollama** (open-source, sin costo) para la Fase 3, lo que permite demostrar la arquitectura de prompts sin depender de APIs de pago. Cabe resaltar que en un entorno de producción real, se recomendaría **Gemini 3 Flash** por su relación precio/calidad y su capa gratuita para desarrollo.
 
@@ -77,19 +82,18 @@ La implementación permite una reducción drástica del tiempo de respuesta, pas
 También se debe considerar que se dispone de monitoreo inmediato ante volúmenes de consultas, tiempos de respuesta, tasas de resolución automática, entre otras, lo que facilita tomar decisiones operativas rápidas.
 
 #### Precisión y confiabilidad en información
-El uso de una arquitectura RAG permite recuperar datos directamente desde las fuentes propias de la compañía, como pedidos, entregas y devoluciones, evitando depender únicamente del conocimiento preentrenado del modelo. Esto no solo mejora la precisión de las respuestas, sino que también facilita la trazabilidad y garantiza la actualidad de la información transaccional utilizada en cada interacción.
+El uso de una arquitectura hibrida propuesta permite recuperar datos directamente desde las fuentes propias de la compañía, como pedidos, entregas y devoluciones, evitando depender únicamente del conocimiento preentrenado del modelo. Esto no solo mejora la precisión de las respuestas, sino que también facilita la trazabilidad y garantiza la actualidad de la información transaccional utilizada en cada interacción.
 
 #### Consistencia y estandarización del servicio
 El sistema garantiza respuestas homogéneas en cuanto a la forma en que se atiende a los usuarios, alineándose con las políticas definidas por la organización. Esto elimina la variabilidad propia de los agentes humanos y contribuye a una mejora consistente en la calidad percibida del servicio.
 
-Además Puede integrarse en múltiples canales como Chat web, WhatsApp, email y redes sociales. Mantenienco consistencia en todos los puntos de contacto.
+Además puede integrarse en múltiples canales como Chat web, WhatsApp, email y redes sociales. Manteniendo consistencia en todos los canales de atención.
 
 #### Eficiencia del agente humano
-En el 20% de los casos más complejos, el sistema genera borradores de respuesta que pueden ser editados por los agentes humanos, lo que reduce su carga cognitiva y les permite enfocarse en tareas de mayor valor como la empatía, la negociación y la resolución de problemas. Este enfoque responde a una estrategia de aumentación, no de reemplazo, donde la tecnología potencia las capacidades del agente en lugar de sustituirlo.
+En el 20% de los casos más complejos, el sistema genera borradores de respuesta que pueden ser editados por los agentes humanos, lo que reduce su carga cognitiva y les permite enfocarse en tareas de mayor valor como la empatía, la negociación y la resolución de problemas. La solución propuesta potencia las capacidades del agente humano en lugar de sustituirlo.
 
 #### Mejora continua
 El sistema permite identificar patrones de consulta, detectar productos con alta tasa de devolución y reconocer fallas logísticas o de catálogo, convirtiéndose en una base sólida para la analítica y la optimización continua del negocio.
-
 
 ### 2. Limitaciones
 
@@ -97,7 +101,7 @@ El sistema permite identificar patrones de consulta, detectar productos con alta
 El modelo no puede reemplazar la empatía humana, lo que limita su efectividad en la atención de quejas emocionales, clientes frustrados o situaciones ambiguas y sensibles. En estos casos, existe el riesgo de que las respuestas sean percibidas como mecánicas si no hay una intervención humana adecuada que aporte comprensión y adaptación al contexto. 
 
 #### Costo inicial
-La implementación de una arquitectura que integra RAG, LLM y sistemas internos conlleva un costo inicial elevado y una alta complejidad técnica. Este proceso requiere una inversión en infraestructura y desarrollo, así como la participación de talento especializado en áreas como machine learning, desarrollo backend y MLOps, lo que puede representar una barrera importante para su adopción.
+La implementación de una arquitectura que integra RAG, LLM y sistemas internos conlleva un costo inicial elevado y una alta complejidad técnica. Este proceso requiere una inversión en infraestructura y desarrollo, así como la participación de talento especializado lo que puede representar una barrera importante para su adopción.
 
 #### Dependencia de la calidad de los datos
 El sistema depende completamente de la calidad de los datos siguiendo el principio de garbage in, garbage out. Problemas como estados de pedidos incorrectos o políticas desactualizadas no solo afectan las respuestas, sino que el modelo no está en capacidad de corregirlos, lo que puede generar desinformación y afectar la experiencia del cliente.
@@ -125,7 +129,7 @@ El sistema implica el uso de datos sensibles como nombre, dirección, historial 
 Además existe el riesgo de uso indebido del sistema por parte de usuarios, quienes pueden intentar manipular el modelo para acceder a información no autorizada. Para mitigar este tipo de amenazas, se recomienda implementar una validación estricta de los inputs, establecer controles robustos de acceso a los datos y aplicar procesos de sanitización de prompts que reduzcan la exposición a instrucciones maliciosas.
 
 #### Impacto laboral
-La implementación del sistema conlleva un riesgo de desplazamiento o incertidumbre laboral, lo que puede impactar negativamente en la motivación de los agentes humanos. Frente a esto, se propone una postura donde las tareas repetitivas se automatizan y el talento humano se enfoca en generar valor. Para gestionar este cambio de manera efectiva, se recomiendan buenas prácticas como una comunicación transparente desde el inicio, la capacitación en el uso de nuevas herramientas y la definición de métricas de éxito orientadas a la satisfacción del agente y la calidad de resolución, en lugar de la reducción de personal.
+La implementación del sistema conlleva un riesgo de desplazamiento o incertidumbre laboral, lo que puede impactar negativamente en la motivación de los agentes humanos. Frente a esto, se propone una postura donde las tareas repetitivas se automatizan y el talento humano se enfoca en generar valor. Para gestionar este cambio de manera efectiva, se recomiendan buenas prácticas como una comunicación transparente desde el inicio, la capacitación en el uso de nuevas herramientas y la definición de métricas de éxito orientadas a la satisfacción del agente humano y la calidad de resolución, en lugar de la reducción de personal.
 
 Se debe tener en cuenta que reducir la supervisión humana a medida que aumenta la automatización, puede derivar en errores no detectados y un deterioro progresivo de la calidad del servicio. Para mitigar este problema, se recomienda mantener un enfoque de human-in-the-loop en casos críticos y realizar revisiones periódicas de calidad.
 
@@ -134,4 +138,3 @@ Existe el riesgo de que el cliente no tenga claridad sobre si está interactuand
 
 #### Riesgo reputacional
 Un error como una respuesta incorrecta o inapropiada puede escalar rápidamente en redes sociales y generar un impacto desproporcionado frente al volumen total de aciertos del sistema, afectando la reputación de la marca. Para mitigar este riesgo, se recomienda implementar filtros de seguridad que prevengan respuestas sensibles y establecer un monitoreo en tiempo real de las interacciones críticas para detectar y corregir incidentes de forma oportuna.
-

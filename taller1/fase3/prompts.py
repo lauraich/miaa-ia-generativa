@@ -146,37 +146,6 @@ def comparar_pedido(numero_pedido: str) -> tuple[str, str]:
     return consultar_pedido_basico(numero_pedido), consultar_pedido(numero_pedido)
 
 
-def texto_criterios_comparacion_notable(numero_pedido: str) -> str | None:
-    """
-    Casos donde el prompt mejorado suele ampliar la brecha frente al básico (mismo contexto).
-
-    - ECO-003: retraso (disculpa + motivo, enlace).
-    - ECO-999: pedido inexistente (negación clara, sin inventar).
-    """
-    n = numero_pedido.strip().upper()
-    if n == "ECO-003":
-        return (
-            "\n  --- Qué valorar en esta comparación (pedido retrasado) ---\n"
-            "  - ¿La respuesta mejorada incluye disculpa explícita y el motivo del retraso del contexto?\n"
-            "  - ¿Se mencionan enlace de seguimiento y fecha estimada?\n"
-            "  - ¿El prompt básico puede omitir empatía o estructura ante un retraso?\n"
-        )
-    if n == "ECO-999":
-        return (
-            "\n  --- Qué valorar en esta comparación (pedido inexistente) ---\n"
-            "  - ¿La respuesta mejorada indica claramente que no hay pedido, sin inventar datos?\n"
-            "  - ¿El básico tiende a ser vago o a suponer información no presente en el contexto?\n"
-            "  - ¿Se ofrece una alternativa de contacto de forma honesta?\n"
-        )
-    return None
-
-
-def imprimir_criterios_comparacion_notable(numero_pedido: str) -> None:
-    """Imprime criterios pedagógicos si el número es uno de los casos notables."""
-    texto = texto_criterios_comparacion_notable(numero_pedido)
-    if texto:
-        print(texto)
-
 
 # ══════════════════════════════════════════════════════════════
 # EJERCICIO 2: PROCESO DE DEVOLUCIÓN
@@ -273,7 +242,6 @@ def _imprimir_comparacion_pedido(numero: str, descripcion: str):
     print(basico)
     print("\n  --- Salida: prompt mejorado ---\n")
     print(mejorado)
-    imprimir_criterios_comparacion_notable(numero)
 
 
 def _imprimir_comparacion_devolucion(producto: str, motivo: str, numero_pedido: str, descripcion: str):
@@ -394,7 +362,6 @@ def modo_interactivo():
             print(basico)
             print("\n--- Salida: prompt mejorado ---\n")
             print(mejorado)
-            imprimir_criterios_comparacion_notable(numero)
         elif opcion == "4":
             producto = input("Nombre del producto: ").strip()
             motivo = input("Motivo de devolución: ").strip()
@@ -424,7 +391,6 @@ if __name__ == "__main__":
         print(basico)
         print("\n--- Salida: prompt mejorado ---\n")
         print(mejorado)
-        imprimir_criterios_comparacion_notable(numero)
     elif len(sys.argv) > 1 and sys.argv[1] == "--comparar-notable":
         print("\n🌿 EcoMarket — Comparación notable (ECO-003 retraso, ECO-999 inexistente)")
         print(f"   Modelo: {MODEL}\n")
