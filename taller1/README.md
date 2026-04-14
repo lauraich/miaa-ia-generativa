@@ -7,11 +7,11 @@
 
 Se propone una **arquitectura en tres capas**:
 
-1. **Clasificador de intención** — Un LLM ligero (GPT-5-nano o un modelo fine-tuned pequeño como distilbert-base) que clasifica cada consulta entrante en una de dos rutas: *automatizable* (80%) o *requiere humano* (20%). Esta clasificación es rápida, económica y suficiente para un problema de enrutamiento binario.
+1. **Clasificador de intención** : Un LLM ligero (GPT-5-nano o un modelo fine-tuned pequeño como distilbert-base) que clasifica cada consulta entrante en una de dos rutas: *automatizable* (80%) o *requiere humano* (20%). Esta clasificación es rápida, económica y suficiente para un problema de enrutamiento binario.
 
-2. **Módulo RAG** para las consultas se propone utilizar un modelo pequeño de cualquier proveedor cómo GPT-5.4-mini o Gemini 3 Flash. El modelo tendría tendría dos formas de obtener información: a través de una tool puede recuperar información en tiempo real de la base de datos de EcoMarket con el fin de verificar información sobre el estado de un pedido y puede hacer una busqueda RAG para obtener información sobre  políticas de devolución o catálogo de productos (documentos de la empresa). Esto elimina las alucinaciones sobre datos transaccionales.
+2. **Módulo RAG**: para las consultas se propone utilizar un modelo pequeño de cualquier proveedor cómo GPT-5.4-mini o Gemini 3 Flash. El modelo tendría tendría dos formas de obtener información: a través de una tool puede recuperar información en tiempo real de la base de datos de EcoMarket con el fin de verificar información sobre el estado de un pedido y puede hacer una busqueda RAG para obtener información sobre  políticas de devolución o catálogo de productos (documentos de la empresa). Esto elimina las alucinaciones sobre datos transaccionales.
 
-3. **Interfaz de asistencia al agente humano** — Para el 20% complejo, el mismo LLM genera un *borrador de respuesta* sugerido que el agente humano puede editar, reduciendo su carga cognitiva sin eliminar el toque humano.
+3. **Interfaz de asistencia al agente humano**: Para el 20% complejo, el mismo LLM genera un *borrador de respuesta* sugerido que el agente humano puede editar, reduciendo su carga cognitiva sin eliminar el toque humano.
 
 ### ¿Por qué este modelo y no otro?
 
@@ -25,7 +25,7 @@ Se propone una **arquitectura en tres capas**:
 
 #### Costo
 
-Un modelo fine-tuned requiere GPU costosa para el entrenamiento y re-entrenamiento cada vez que cambian productos o políticas. GPT-5.4 completo, a $2.50/1M tokens de entrada y $15/1M de salida, supera los $3,000 USD mensuales a 5,000 consultas diarias con prompts típicos de ~800 tokens. La propuesta RAG con un modelo pequeño como GPT-5.4-mini (~$0.00128/consulta) o Gemini 3 Flash (~$0.00085/consulta) reduce ese gasto a entre $130 y $192 USD mensuales — más de 15 veces más barato que usar el modelo completo.
+Un modelo fine-tuned requiere GPU costosa para el entrenamiento y re-entrenamiento cada vez que cambian productos o políticas. GPT-5.4 completo, a $2.50/1M tokens de entrada y $15/1M de salida, supera los $3,000 USD mensuales a 5,000 consultas diarias con prompts típicos de aprox. 800 tokens. La propuesta RAG con un modelo pequeño como GPT-5.4-mini (aprox. $0.00128/consulta) o Gemini 3 Flash (~$0.00085/consulta) reduce ese gasto a entre $130 y $192 USD mensuales,es decir, más de 15 veces más barato que usar el modelo completo.
 
 #### Escalabilidad
 
